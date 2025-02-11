@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Nuclear Radiation Monitoring System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --warning-color: #FFC107;
+            --danger-color: #f44336;
+            --background-dark: #1a1a1a;
+            --panel-bg: rgba(51, 51, 51, 0.9);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: var(--background-dark);
+            color: #fff;
+            line-height: 1.6;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            height: 100vh;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        .sidebar {
+            padding: 20px;
+            background: linear-gradient(145deg, #2a2a2a, #1f1f1f);
+            overflow-y: auto;
+            box-shadow: 2px 0 20px rgba(0,0,0,0.4);
+        }
+
+        .data-panel {
+            background: var(--panel-bg);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .data-panel:hover {
+            transform: translateY(-5px);
+        }
+
+        .radiation-level {
+            font-size: 32px;
+            font-weight: bold;
+            background: linear-gradient(45deg, var(--primary-color), #45a049);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin: 15px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .chart-container {
+            height: 250px;
+            margin: 20px 0;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .comparison-chart {
+            height: 200px;
+            margin: 15px 0;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .control-btn {
+            background: var(--primary-color);
+            border: none;
+            padding: 12px 20px;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .control-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.active {
+            background: var(--primary-color);
+        }
+
+        .status-dot.warning {
+            background: var(--warning-color);
+        }
+
+        .status-dot.danger {
+            background: var(--danger-color);
+        }
+
+        .weather-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+
+        .nuclear-site-list {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .site-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(0,0,0,0.2);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .site-item:hover {
+            background: rgba(0,0,0,0.4);
+        }
+
+        .radiation-scale {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+
+        .scale-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+
+        .scale-item.warning {
+            background: rgba(255, 193, 7, 0.2);
+        }
+
+        .scale-item.danger {
+            background: rgba(244, 67, 54, 0.2);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .legend {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .gradient-bar {
+            height: 25px;
+            background: linear-gradient(to right, 
+                var(--primary-color), 
+                var(--warning-color), 
+                var(--danger-color));
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .time-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .time-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .time-btn.active {
+            background: var(--primary-color);
+        }
+
+        .exclusion-zone {
+            border: 2px dashed var(--danger-color);
+            animation: borderPulse 2s infinite;
+        }
+
+        @keyframes borderPulse {
+            0% { border-color: rgba(244, 67, 54, 0.5); }
+            50% { border-color: rgba(244, 67, 54, 1); }
+            100% { border-color: rgba(244, 67, 54, 0.5); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Nuclear Radiation Monitoring</h2>
+            
+            <div class="data-panel">
+                <div class="status-indicator">
+                    <div class="status-dot active"></div>
+                    <span>System Online - Real-time Monitoring</span>
+                </div>
+                <h3>Current Readings</h3>
+                <div class="radiation-level" id="current-level">0.12 μSv/h</div>
+                <p>Location: <span id="current-location">Forsmark</span></p>
+                <p>Last Updated: <span id="timestamp"></span></p>
+                <div class="chart-container">
+                    <canvas id="radiationChart"></canvas>
+                </div>
+                <div class="time-controls">
+                    <button class="time-btn active">1H</button>
+                    <button class="time-btn">24H</button>
+                    <button class="time-btn">7D</button>
+                    <button class="time-btn">30D</button>
+                </div>
+            </div>
+
+            <div class="data-panel">
+                <h3>Facility Comparison</h3>
+                <div class="comparison-chart">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+                <div class="radiation-scale">
+                    <div class="scale-item">
+                        <span>Background: 0.1-0.2 μSv/h</span>
+                    </div>
+                    <div class="scale-item warning">
+                        <span>Swedish NPPs: 0.2-0.5 μSv/h</span>
+                    </div>
+                    <div class="scale-item danger">
+                        <span>Chernobyl Zone: 2.0-5.0 μSv/h</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="control-btn" onclick="toggleHeatmap()">Toggle Heatmap</button>
+                <button class="control-btn" onclick="toggleAnimation()">Animate Data</button>
+            </div>
+
+            <div class="data-panel">
+                <h3>Environmental Factors</h3>
+                <div class="weather-info">
+                    <span>Wind: <span id="wind-speed">5 m/s NE</span></span>
+                    <span>Temp: <span id="temperature">18°C</span></span>
+                    <span>Pressure: <span id="pressure">1013 hPa</span></span>
+                </div>
+            </div>
+
+            <div class="legend">
+                <h3>Radiation Levels (μSv/h)</h3>
+                <div class="gradient-bar"></div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>0.1</span>
+                    <span>2.5</span>
+                    <span>5.0+</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+    </div>
+      <script>
+          // Initialize map centered between Sweden and Chernobyl
+          const map = L.map('map').setView([56.0, 20.0], 5);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '© OpenStreetMap contributors'
+          }).addTo(map);
+
+          // Nuclear sites data
+          const nuclearSites = [
+              {
+                  name: "Chernobyl Nuclear Power Plant",
+                  lat: 51.3892,
+                  lng: 30.0992,
+                  type: "nuclear",
+                  status: "disaster",
+                  radiationLevel: () => Math.random() * 3.0 + 2.0,
+                  exclusionZone: 30
+              },
+              {
+                  name: "Forsmark Nuclear Power Plant",
+                  lat: 60.4033,
+                  lng: 18.1673,
+                  type: "nuclear",
+                  status: "operational",
+                  radiationLevel: () => Math.random() * 0.2 + 0.1,
+                  reactors: 3,
+                  capacity: "3271 MW"
+              },
+              {
+                  name: "Oskarshamn Nuclear Power Plant",
+                  lat: 57.4183,
+                  lng: 16.6707,
+                  type: "nuclear",
+                  status: "operational",
+                  radiationLevel: () => Math.random() * 0.2 + 0.1,
+                  reactors: 3,
+                  capacity: "2603 MW"
+              },
+              {
+                  name: "Ringhals Nuclear Power Plant",
+                  lat: 57.2581,
+                  lng: 12.1119,
+                  type: "nuclear",
+                  status: "operational",
+                  radiationLevel: () => Math.random() * 0.2 + 0.1,
+                  reactors: 4,
+                  capacity: "3952 MW"
+              }
+          ];
+
+          // Initialize features
+          function initializeMap() {
+              // Add markers and exclusion zones
+              nuclearSites.forEach(site => {
+                  // Create marker
+                  const icon = L.divIcon({
+                      className: 'custom-div-icon',
+                      html: `<div style="background-color: ${site.status === 'disaster' ? '#f44336' : '#4CAF50'}; 
+                           width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>`,
+                      iconSize: [20, 20]
+                  });
+
+                  L.marker([site.lat, site.lng], {icon: icon})
+                      .addTo(map)
+                      .bindPopup(`
+                          <h3>${site.name}</h3>
+                          <p>Status: ${site.status}</p>
+                          <p>Current Radiation: ${site.radiationLevel().toFixed(2)} μSv/h</p>
+                          ${site.reactors ? `<p>Reactors: ${site.reactors}</p>` : ''}
+                          ${site.capacity ? `<p>Capacity: ${site.capacity}</p>` : ''}
+                      `);
+
+                  // Add exclusion zone if applicable
+                  if (site.exclusionZone) {
+                      L.circle([site.lat, site.lng], {
+                          color: '#f44336',
+                          fillColor: '#f44336',
+                          fillOpacity: 0.2,
+                          radius: site.exclusionZone * 1000,
+                          className: 'exclusion-zone'
+                      }).addTo(map);
+                  }
+              });
+
+              // Initialize heatmap
+              const points = generateHeatmapData();
+              heat = L.heatLayer(points, {
+                  radius: 30,
+                  blur: 20,
+                  maxZoom: 10,
+                  gradient: {
+                      0.1: '#4CAF50',
+                      0.3: '#FFC107',
+                      0.6: '#FF5722',
+                      0.9: '#f44336'
+                  }
+              }).addTo(map);
+          }
+
+          function generateHeatmapData() {
+              const points = [];
+              nuclearSites.forEach(site => {
+                  const pointCount = site.status === 'disaster' ? 500 : 300;
+                  const maxRadius = site.status === 'disaster' ? 2 : 0.5;
+                
+                  for (let i = 0; i < pointCount; i++) {
+                      const radius = Math.random() * maxRadius;
+                      const angle = Math.random() * Math.PI * 2;
+                      const intensity = site.radiationLevel();
+                      points.push([
+                          site.lat + radius * Math.cos(angle),
+                          site.lng + radius * Math.sin(angle),
+                          intensity
+                      ]);
+                  }
+              });
+              return points;
+          }
+
+          // Animation control
+          let animationInterval;
+          function toggleAnimation() {
+              if (animationInterval) {
+                  clearInterval(animationInterval);
+                  animationInterval = null;
+                  document.querySelector('[onclick="toggleAnimation"]').textContent = 'Start Animation';
+              } else {
+                  animationInterval = setInterval(() => {
+                      heat.setLatLngs(generateHeatmapData());
+                  }, 2000);
+                  document.querySelector('[onclick="toggleAnimation"]').textContent = 'Stop Animation';
+              }
+          }
+
+          function toggleHeatmap() {
+              if (map.hasLayer(heat)) {
+                  map.removeLayer(heat);
+              } else {
+                  map.addLayer(heat);
+              }
+          }
+
+          function updateWeatherData() {
+              const windDirections = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+              document.getElementById('wind-speed').textContent = 
+                  `${(Math.random() * 10 + 2).toFixed(1)} m/s ${windDirections[Math.floor(Math.random() * windDirections.length)]}`;
+              document.getElementById('temperature').textContent = 
+                  `${(Math.random() * 30 - 10).toFixed(1)}°C`;
+              document.getElementById('pressure').textContent = 
+                  `${Math.floor(Math.random() * 50 + 990)} hPa`;
+          }
+
+          // Initialize comparison chart
+          function initializeComparisonChart() {
+              const ctx = document.getElementById('comparisonChart').getContext('2d');
+              new Chart(ctx, {
+                  type: 'bar',
+                  data: {
+                      labels: ['Background', 'Swedish NPPs', 'Chernobyl Zone'],
+                      datasets: [{
+                          label: 'Radiation Levels (μSv/h)',
+                          data: [0.15, 0.25, 3.5],
+                          backgroundColor: ['#4CAF50', '#FFC107', '#f44336']
+                      }]
+                  },
+                  options: {
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                          legend: {
+                              display: false
+                          }
+                      },
+                      scales: {
+                          y: {
+                              beginAtZero: true,
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              },
+                              ticks: {
+                                  color: '#fff'
+                              }
+                          },
+                          x: {
+                              grid: {
+                                  color: 'rgba(255, 255, 255, 0.1)'
+                              },
+                              ticks: {
+                                  color: '#fff'
+                              }
+                          }
+                      }
+                  }
+              });
+          }
+
+          // Add this to your existing JavaScript code
+          function updateCurrentReadings() {
+              // Get random site for reading
+              const randomSite = nuclearSites[Math.floor(Math.random() * nuclearSites.length)];
+              const currentLevel = randomSite.radiationLevel();
+            
+              // Update DOM elements
+              document.getElementById('current-level').textContent = `${currentLevel.toFixed(2)} μSv/h`;
+              document.getElementById('current-location').textContent = randomSite.name;
+            
+              // Update chart with new data point
+              const chart = Chart.getChart('radiationChart');
+              if (chart) {
+                  chart.data.datasets[0].data.push(currentLevel);
+                  chart.data.datasets[0].data.shift();
+                  chart.data.labels.push(moment().format('HH:mm:ss'));
+                  chart.data.labels.shift();
+                  chart.update('none');
+              }
+          }
+
+          // Initialize radiation chart
+          function initializeRadiationChart() {
+              const ctx = document.getElementById('radiationChart').getContext('2d');
+              new Chart(ctx, {
+                  type: 'line',
+                  data: {
+                      labels: Array.from({length: 20}, () => moment().format('HH:mm:ss')),
+                      datasets: [{
+                          label: 'Radiation Level (μSv/h)',
+                          data: Array.from({length: 20}, () => 0.1),
+                          borderColor: '#4CAF50',
+                          backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                          tension: 0.4,
+                          fill: true
+                      }]
+                  },
+                  options: {
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      animation: {
+                          duration: 0
+                      }
+                  }
+              });
+          }
+
+          // Initialize everything when the page loads
+          window.onload = function() {
+              initializeMap();
+              initializeComparisonChart();
+              initializeRadiationChart();
+            
+              // Start periodic updates
+              setInterval(() => {
+                  updateCurrentReadings();
+                  updateWeatherData();
+                  document.getElementById('timestamp').textContent = moment().format('YYYY-MM-DD HH:mm:ss');
+              }, 1000);
+          };
+      </script>
+  </body>
+</html>
