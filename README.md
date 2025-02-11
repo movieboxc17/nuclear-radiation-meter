@@ -1,0 +1,1 @@
+This interactive map displays nuclear radiation levels across various locations. Please note that the data may not always be exact and could contain occasional inaccuracies. We appreciate your patience as we continue refining the system. A full version with improved accuracy will be available in the coming months.
